@@ -11,6 +11,7 @@ def get_current_user(
 ) -> CurrentUser:
     valid_roles = ["admin", "teacher", "parent"]
     
+    
     if x_user_role not in valid_roles:
         raise HTTPException(status_code=400, detail="Invalid role provided")
         

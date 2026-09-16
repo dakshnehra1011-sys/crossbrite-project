@@ -1,4 +1,3 @@
-from redis_client import trigger_evaluation_task
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -7,12 +6,34 @@ from database import engine, get_db
 import models
 import schemas
 from dependencies import get_current_user, CurrentUser
+from redis_client import trigger_evaluation_task
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Crossbrite Evaluation Service")
+with Session(engine) as db_session:
+    if not db_session.query(models.User).filter(models.User.id == 1).first():
+        db_session.add(models.User(id=1, username="test_teacher", role=models.RoleEnum.teacher))
+        db_session.commit()
 
-@app.post("/sessions/", response_model=schemas.SessionResponse, status_code=status.HTTP_201_CREATED)
+tags_metadata = [
+    {
+        "name": "Sessions Management",
+        "description": "Endpoints for creating, reading, and deleting educational sessions. Strictly protected by RBAC.",
+    },
+    {
+        "name": "AI Evaluations",
+        "description": "Background jobs for processing sessions asynchronously via Redis.",
+    },
+]
+
+app = FastAPI(
+    title="Crossbrite Evaluation Service",
+    description="A robust microservice for managing educational sessions with Role-Based Access Control (RBAC) and asynchronous AI evaluations.",
+    version="1.0.0",
+    openapi_tags=tags_metadata
+)
+
+@app.post("/sessions/", response_model=schemas.SessionResponse, status_code=status.HTTP_201_CREATED, tags=["Sessions Management"], summary="Create a new Session", description="Allows a teacher to create a new class session. Only accessible if the user role is 'teacher'.")
 def create_session(
     session_in: schemas.SessionCreate, 
     db: Session = Depends(get_db),
@@ -31,7 +52,7 @@ def create_session(
     db.refresh(new_session)
     return new_session
 
-@app.get("/sessions/", response_model=List[schemas.SessionResponse])
+@app.get("/sessions/", response_model=List[schemas.SessionResponse], tags=["Sessions Management"], summary="Get all Sessions", description="Fetches sessions based on user role. Admins can see all sessions globally, while teachers can only see their own sessions.")
 def get_sessions(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
@@ -43,7 +64,7 @@ def get_sessions(
     else:
         return []
 
-@app.get("/sessions/{session_id}", response_model=schemas.SessionResponse)
+@app.get("/sessions/{session_id}", response_model=schemas.SessionResponse, tags=["Sessions Management"], summary="Get a specific Session", description="Fetch details of a single session by its unique ID. Enforces strict RBAC to prevent unauthorized access.")
 def get_session(
     session_id: int, 
     db: Session = Depends(get_db),
@@ -58,7 +79,7 @@ def get_session(
         
     return db_session
 
-@app.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Sessions Management"], summary="Delete a Session", description="Allows admins or the owning teacher to delete a session permanently from the database.")
 def delete_session(
     session_id: int, 
     db: Session = Depends(get_db),
@@ -75,7 +96,7 @@ def delete_session(
     db.commit()
     return None
 
-@app.post("/sessions/{session_id}/evaluate", status_code=status.HTTP_202_ACCEPTED)
+@app.post("/sessions/{session_id}/evaluate", status_code=status.HTTP_202_ACCEPTED, tags=["AI Evaluations"], summary="Trigger Background Evaluation", description="Enqueues an asynchronous background task in Redis to evaluate the session. Returns a 202 Accepted response instantly without blocking the main thread.")
 def trigger_evaluation(
     session_id: int,
     db: Session = Depends(get_db),
