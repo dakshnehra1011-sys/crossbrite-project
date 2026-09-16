@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum, Text, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 import enum
 from datetime import datetime
@@ -16,10 +16,35 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
     role = Column(Enum(RoleEnum), nullable=False)
+    is_approved = Column(Boolean, default=False)
 
     # Relationships (A teacher has multiple sessions)
     sessions = relationship("Session", back_populates="teacher")
+    
+    # Relationships (A parent has multiple students)
+    students = relationship("Student", back_populates="parent")
+
+class Student(Base):
+    __tablename__ = "students"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    parent_id = Column(Integer, ForeignKey("users.id"))
+    
+    parent = relationship("User", back_populates="students")
+    enrollments = relationship("Enrollment", back_populates="student", cascade="all, delete-orphan")
+
+class Enrollment(Base):
+    __tablename__ = "enrollments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"))
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+    
+    student = relationship("Student", back_populates="enrollments")
+    session = relationship("Session", back_populates="enrollments")
 
 
 class Session(Base):
@@ -34,6 +59,7 @@ class Session(Base):
     
     teacher = relationship("User", back_populates="sessions")
     evaluations = relationship("Evaluation", back_populates="session", cascade="all, delete-orphan")
+    enrollments = relationship("Enrollment", back_populates="session", cascade="all, delete-orphan")
 
 
 class Evaluation(Base):

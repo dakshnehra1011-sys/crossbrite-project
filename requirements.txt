@@ -6,3 +6,6 @@ redis==5.0.1
 pydantic==2.5.2
 pydantic-settings==2.1.0
 pytest==7.4.3
+passlib[bcrypt]
+bcrypt==4.0.1
+PyJWT
