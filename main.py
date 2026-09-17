@@ -1,7 +1,6 @@
-# Crossbrite Evaluation Service
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import random
@@ -30,7 +29,6 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
 
-# --- NAYE AUTHENTICATION SCHEMAS ---
 class AuthRequest(BaseModel):
     user_id: int
     password: str
@@ -39,8 +37,9 @@ class SignupRequest(BaseModel):
     name: str
     password: str
     role: str
+    student_name: Optional[str] = None
+    student_roll: Optional[str] = None
 
-# --- NAYE AUTHENTICATION ENDPOINTS ---
 @app.post("/signup", tags=["Authentication"])
 def signup(request: SignupRequest, db: Session = Depends(get_db)):
     db_username = f"{request.name}_{random.randint(10000, 99999)}"
@@ -50,6 +49,25 @@ def signup(request: SignupRequest, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    if request.role == "parent" and request.student_name and request.student_roll:
+        student = db.query(models.Student).filter(
+            models.Student.name == request.student_name,
+            models.Student.roll_no == request.student_roll
+        ).first()
+        
+        if not student:
+            db.delete(new_user)
+            db.commit()
+            raise HTTPException(status_code=400, detail="Student not found. Please check school records.")
+            
+        if student.parent_id is not None:
+            db.delete(new_user)
+            db.commit()
+            raise HTTPException(status_code=400, detail="This student is already linked to a parent.")
+            
+        student.parent_id = new_user.id
+        db.commit()
     
     return {"id": new_user.id, "username": request.name, "role": new_user.role}
 
@@ -68,9 +86,16 @@ def login(request: AuthRequest, db: Session = Depends(get_db)):
     display_name = user.username.split('_')[0] if '_' in user.username else user.username
     token = jwt.encode({"sub": str(user.id), "role": user.role.value}, SECRET_KEY, algorithm=ALGORITHM)
     
-    return {"id": user.id, "username": display_name, "role": user.role, "token": token}
+    response_data = {"id": user.id, "username": display_name, "role": user.role, "token": token}
+    
+    if user.role.value == "parent":
+        student = db.query(models.Student).filter(models.Student.parent_id == user.id).first()
+        if student:
+            response_data["student_name"] = student.name
+            response_data["student_roll"] = student.roll_no
+            
+    return response_data
 
-# --- BAAKI CRUD ENDPOINTS (SAME) ---
 @app.post("/sessions/", response_model=schemas.SessionResponse, status_code=status.HTTP_201_CREATED)
 def create_session(session_in: schemas.SessionCreate, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     if current_user.role != "teacher":
@@ -79,7 +104,18 @@ def create_session(session_in: schemas.SessionCreate, db: Session = Depends(get_
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
+    
+    if session_in.student_ids:
+        for sid in session_in.student_ids:
+            enrollment = models.Enrollment(student_id=sid, session_id=new_session.id)
+            db.add(enrollment)
+        db.commit()
+        
     return new_session
+
+@app.get("/students", response_model=List[schemas.StudentResponse])
+def get_students(db: Session = Depends(get_db)):
+    return db.query(models.Student).all()
 
 @app.get("/sessions/", response_model=List[schemas.SessionResponse])
 def get_sessions(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -88,12 +124,10 @@ def get_sessions(db: Session = Depends(get_db), current_user: CurrentUser = Depe
     elif current_user.role == "teacher":
         return db.query(models.Session).filter(models.Session.teacher_id == current_user.id).all()
     elif current_user.role == "parent":
-        # Find students linked to this parent
         students = db.query(models.Student).filter(models.Student.parent_id == current_user.id).all()
         student_ids = [s.id for s in students]
         if not student_ids:
             return []
-        # Find enrollments for these students
         enrollments = db.query(models.Enrollment).filter(models.Enrollment.student_id.in_(student_ids)).all()
         session_ids = [e.session_id for e in enrollments]
         return db.query(models.Session).filter(models.Session.id.in_(session_ids)).all()
@@ -193,3 +227,69 @@ def approve_user(user_id: int, db: Session = Depends(get_db), current_user: Curr
     user.is_approved = True
     db.commit()
     return {"message": "User approved successfully"}
+
+@app.get("/users", response_model=List[schemas.UserResponse])
+def get_all_users(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can view all users")
+    return db.query(models.User).filter(models.User.role != models.RoleEnum.admin).all()
+
+@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete users")
+        
+    user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user_to_delete:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user_to_delete.role == models.RoleEnum.parent:
+        db.query(models.Student).filter(models.Student.parent_id == user_id).update({"parent_id": None})
+    elif user_to_delete.role == models.RoleEnum.teacher:
+        sessions = db.query(models.Session).filter(models.Session.teacher_id == user_id).all()
+        for session in sessions:
+            db.delete(session)
+            
+    db.delete(user_to_delete)
+    db.commit()
+    return None
+
+@app.put("/users/{user_id}/password")
+def change_user_password(user_id: int, pwd_in: schemas.PasswordChange, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can change passwords")
+        
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.hashed_password = pwd_context.hash(pwd_in.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+@app.post("/sessions/{session_id}/students/{student_id}")
+def admin_add_student(session_id: int, student_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can manage enrollments directly here")
+        
+    existing = db.query(models.Enrollment).filter_by(session_id=session_id, student_id=student_id).first()
+    if not existing:
+        db.add(models.Enrollment(session_id=session_id, student_id=student_id))
+        db.commit()
+    return {"message": "Student enrolled"}
+
+@app.delete("/sessions/{session_id}/students/{student_id}")
+def admin_remove_student(session_id: int, student_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can manage enrollments directly here")
+        
+    existing = db.query(models.Enrollment).filter_by(session_id=session_id, student_id=student_id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+    return {"message": "Student removed"}
+
+@app.get("/sessions/{session_id}/students")
+def get_session_students(session_id: int, db: Session = Depends(get_db)):
+    enrollments = db.query(models.Enrollment).filter(models.Enrollment.session_id == session_id).all()
+    return [e.student_id for e in enrollments]

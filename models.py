@@ -20,10 +20,8 @@ class User(Base):
     role = Column(Enum(RoleEnum), nullable=False)
     is_approved = Column(Boolean, default=False)
 
-    # Relationships (A teacher has multiple sessions)
     sessions = relationship("Session", back_populates="teacher")
     
-    # Relationships (A parent has multiple students)
     students = relationship("Student", back_populates="parent")
 
 class Student(Base):
@@ -31,6 +29,7 @@ class Student(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    roll_no = Column(String, nullable=True)
     parent_id = Column(Integer, ForeignKey("users.id"))
     
     parent = relationship("User", back_populates="students")

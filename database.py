@@ -4,7 +4,6 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 import os
 
-# Ab hum environment variable se URL lenge, warna default local use karenge
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/evaldb")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
