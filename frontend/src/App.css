@@ -1,15 +1,15 @@
 /* Swiss UI Components */
 
 .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 40px 20px;
+  max-width: 100%;
+  min-height: 100vh;
+  padding: 30px 40px;
 }
 
 .header {
-  border-bottom: 4px solid var(--border-heavy);
-  padding-bottom: 20px;
-  margin-bottom: 40px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 15px;
+  margin-bottom: 30px;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -30,22 +30,24 @@
 
 .auth-box {
   background: #fff;
-  border: 4px solid var(--border-heavy);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   padding: 40px;
   width: 100%;
-  max-width: 480px;
-  box-shadow: 16px 16px 0 var(--border-heavy);
+  max-width: 440px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .auth-box:hover {
-  transform: translate(-4px, -4px);
-  box-shadow: 20px 20px 0 var(--accent-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
 }
 
 .auth-box h2 {
   text-transform: uppercase;
-  border-bottom: 4px solid var(--border-heavy);
+  color: var(--accent-blue);
+  border-bottom: 2px solid var(--border-color);
   padding-bottom: 10px;
   margin-bottom: 30px;
 }
@@ -59,41 +61,41 @@
 /* Inputs & Buttons */
 .swiss-input {
   font-family: var(--font-sans);
-  font-size: 1.125rem;
-  padding: 15px 20px;
-  border: 3px solid var(--border-heavy);
-  background: var(--bg-color);
+  font-size: 0.95rem;
+  padding: 12px 15px;
+  border: 1px solid var(--border-heavy);
+  background: #fff;
   outline: none;
-  transition: border-color 0.2s;
-  border-radius: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
 }
 
 .swiss-input:focus {
   border-color: var(--accent-blue);
-  box-shadow: 4px 4px 0 var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .swiss-btn {
   font-family: var(--font-heading);
-  font-weight: 700;
-  font-size: 1.125rem;
+  font-weight: 600;
+  font-size: 0.9rem;
   text-transform: uppercase;
-  padding: 15px 24px;
-  background: var(--text-primary);
+  padding: 10px 20px;
+  background: var(--accent-blue);
   color: #fff;
-  border: 3px solid var(--text-primary);
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s;
-  border-radius: 0;
+  border-radius: 6px;
   display: inline-block;
   text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .swiss-btn:hover {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-  box-shadow: 6px 6px 0 var(--border-heavy);
-  transform: translate(-2px, -2px);
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
 }
 
 .swiss-btn.outline {
@@ -102,8 +104,7 @@
 }
 
 .swiss-btn.outline:hover {
-  background: var(--bg-color);
-  box-shadow: 4px 4px 0 var(--text-primary);
+  background: #f0f0f0;
 }
 
 .swiss-btn.danger {
@@ -112,7 +113,6 @@
 }
 .swiss-btn.danger:hover {
   background: #D50000;
-  box-shadow: 6px 6px 0 var(--border-heavy);
 }
 
 .swiss-btn.warning {
@@ -122,6 +122,53 @@
 }
 .swiss-btn.warning:hover {
   background: #FFC400;
+}
+
+/* Tabs */
+.tab-container {
+  display: flex;
+  gap: 40px;
+  min-height: calc(100vh - 200px);
+}
+
+.tab-buttons {
+  display: flex;
+  flex-direction: column;
+  width: 250px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  padding-right: 20px;
+  gap: 10px;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  text-align: left;
+  border-radius: 0 6px 6px 0;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  color: var(--text-primary);
+  background: rgba(0,0,0,0.02);
+}
+
+.tab-button.active {
+  color: var(--accent-blue);
+  border-left-color: var(--accent-blue);
+  background: #EFF6FF; /* Very light blue */
+}
+
+.tab-content {
+  flex-grow: 1;
+  min-width: 0;
 }
 
 /* Dashboards */
@@ -134,23 +181,25 @@
 
 .swiss-card {
   background: #fff;
-  border: 4px solid var(--border-heavy);
-  padding: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 
 .swiss-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 12px 12px 0 var(--accent-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
 }
 
 .swiss-card h4 {
-  font-size: 1.5rem;
-  margin-bottom: 15px;
-  border-bottom: 3px solid var(--border-heavy);
-  padding-bottom: 10px;
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
   text-transform: uppercase;
 }
 
@@ -166,32 +215,33 @@
 
 .swiss-card .actions {
   margin-top: auto;
-  padding-top: 20px;
+  padding-top: 15px;
   display: flex;
-  gap: 10px;
-  border-top: 3px solid var(--border-heavy);
+  gap: 8px;
+  border-top: 1px solid var(--border-color);
 }
 
 .swiss-card .actions button {
   flex: 1;
-  padding: 10px;
-  font-size: 0.9rem;
+  padding: 6px;
+  font-size: 0.8rem;
 }
 
 /* Evaluation Status Badge */
 .status-badge {
-  padding: 15px;
-  border: 3px solid var(--border-heavy);
+  padding: 10px;
+  border: 2px solid var(--border-heavy);
+  border-radius: 4px;
   font-weight: 600;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   text-transform: uppercase;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .status-badge.evaluated {
   background: var(--accent-green);
   color: #fff;
-  border-color: var(--border-heavy);
+  border-color: var(--accent-green);
 }
 
 .status-badge.pending {
@@ -202,22 +252,27 @@
 
 /* Banners */
 .swiss-banner {
-  background: var(--text-primary);
-  color: #fff;
-  padding: 30px 40px;
-  border: 4px solid var(--border-heavy);
-  margin-bottom: 40px;
+  background: var(--bg-color);
+  color: var(--text-primary);
+  padding: 20px 30px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 30px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 .swiss-banner h2 {
-  color: #fff;
+  color: var(--text-primary);
   margin: 0;
 }
 .swiss-banner.admin {
-  background: var(--accent-red);
-  box-shadow: 12px 12px 0 var(--border-heavy);
+  background: var(--text-primary);
+  color: #fff;
+}
+.swiss-banner.admin h2 {
+  color: #fff;
 }
 
 /* User Info Panel */

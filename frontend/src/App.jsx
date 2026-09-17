@@ -10,14 +10,15 @@ export default function App() {
 
   return (
     <div className="container">
-      <header className="header">
-        <h1>CROSSBRITE</h1>
+      <header className="header" style={{ marginBottom: "20px" }}>
+        <h1 style={{ fontSize: "1.5rem", letterSpacing: "-1px" }}>CROSSBRITE</h1>
         {currentUser && (
-          <div style={{ textAlign: "right" }}>
-            <div className="user-info">
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <div className="user-info" style={{ fontSize: "0.95rem" }}>
               Welcome, {currentUser.username}
               <span className="role">#{currentUser.id} | {currentUser.role}</span>
             </div>
+            <button onClick={handleLogout} className="swiss-btn danger outline" style={{ padding: "6px 12px", fontSize: "0.8rem" }}>Logout</button>
           </div>
         )}
       </header>
@@ -25,17 +26,11 @@ export default function App() {
       {!currentUser ? (
         <AuthScreen onAuthSuccess={setCurrentUser} />
       ) : (
-        <>
-          <div style={{ marginBottom: "40px", display: "flex", justifyContent: "flex-end" }}>
-            <button onClick={handleLogout} className="swiss-btn danger outline">Logout</button>
-          </div>
-
-          <main>
-            {currentUser.role === "admin" && <AdminTab user={currentUser} />}
-            {currentUser.role === "teacher" && <TeacherTab user={currentUser} />}
-            {currentUser.role === "parent" && <ParentTab user={currentUser} />}
-          </main>
-        </>
+        <main>
+          {currentUser.role === "admin" && <AdminTab user={currentUser} />}
+          {currentUser.role === "teacher" && <TeacherTab user={currentUser} />}
+          {currentUser.role === "parent" && <ParentTab user={currentUser} />}
+        </main>
       )}
     </div>
   );
@@ -164,6 +159,7 @@ function AdminTab({ user }) {
   const [allStudents, setAllStudents] = useState([]);
   const [managingSessionId, setManagingSessionId] = useState(null);
   const [sessionEnrollments, setSessionEnrollments] = useState([]);
+  const [activeTab, setActiveTab] = useState("users");
 
   const loadSessions = async () => {
     const response = await fetch(`${API_URL}/sessions/`, { headers });
@@ -274,45 +270,70 @@ function AdminTab({ user }) {
         <button onClick={loadSessions} className="swiss-btn outline" style={{ borderColor: "#fff", color: "#fff" }}>Sync</button>
       </div>
 
-      {pendingUsers.length > 0 && (
-        <div style={{ marginBottom: "40px" }}>
-          <h3 style={{ textTransform: "uppercase", borderBottom: "3px solid var(--border-heavy)", paddingBottom: "10px" }}>
-            PENDING APPROVALS ({pendingUsers.length})
-          </h3>
-          <div className="dashboard-grid" style={{ marginTop: "20px" }}>
-            {pendingUsers.map(u => (
-              <div key={u.id} className="swiss-card" style={{ borderColor: "var(--accent-red)" }}>
-                <h4>{u.username}</h4>
-                <div className="meta">ROLE: {u.role} | ID: #{u.id}</div>
-                <div className="actions" style={{ borderTop: "none" }}>
-                  <button onClick={() => approveUser(u.id)} className="swiss-btn">APPROVE</button>
+      <div className="tab-container">
+        <div className="tab-buttons">
+          <button 
+            className={`tab-button ${activeTab === "users" ? "active" : ""}`} 
+            onClick={() => setActiveTab("users")}
+          >
+            User Management
+          </button>
+          <button 
+            className={`tab-button ${activeTab === "sessions" ? "active" : ""}`} 
+            onClick={() => setActiveTab("sessions")}
+          >
+            Session Management
+          </button>
+        </div>
+
+        <div className="tab-content">
+          {activeTab === "users" && (
+            <div>
+              {pendingUsers.length > 0 && (
+                <div style={{ marginBottom: "40px" }}>
+                  <h3 style={{ textTransform: "uppercase", borderBottom: "2px solid var(--border-heavy)", paddingBottom: "10px" }}>
+                    PENDING APPROVALS ({pendingUsers.length})
+                  </h3>
+                  <div className="dashboard-grid" style={{ marginTop: "20px" }}>
+                    {pendingUsers.map(u => (
+                      <div key={u.id} className="swiss-card" style={{ borderColor: "var(--accent-red)" }}>
+                        <h4>{u.username}</h4>
+                        <div className="meta">ROLE: {u.role} | ID: #{u.id}</div>
+                        <div className="actions" style={{ borderTop: "none" }}>
+                          <button onClick={() => approveUser(u.id)} className="swiss-btn">APPROVE</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginBottom: "40px" }}>
+                <h3 style={{ textTransform: "uppercase", borderBottom: "2px solid var(--border-heavy)", paddingBottom: "10px" }}>
+                  USER DIRECTORY ({users.length})
+                </h3>
+                <div className="dashboard-grid" style={{ marginTop: "20px" }}>
+                  {users.map(u => (
+                    <div key={u.id} className="swiss-card">
+                      <h4>{u.username}</h4>
+                      <div className="meta">ROLE: {u.role} | ID: #{u.id} | APPROVED: {u.is_approved ? "YES" : "NO"}</div>
+                      <div className="actions" style={{ borderTop: "none", marginTop: "10px" }}>
+                        <button onClick={() => changePassword(u.id)} className="swiss-btn warning">PWD</button>
+                        <button onClick={() => deleteUser(u.id)} className="swiss-btn danger">DEL</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ marginBottom: "40px" }}>
-        <h3 style={{ textTransform: "uppercase", borderBottom: "3px solid var(--border-heavy)", paddingBottom: "10px" }}>
-          USER MANAGEMENT ({users.length})
-        </h3>
-        <div className="dashboard-grid" style={{ marginTop: "20px" }}>
-          {users.map(u => (
-            <div key={u.id} className="swiss-card" style={{ padding: "15px" }}>
-              <h4>{u.username}</h4>
-              <div className="meta">ROLE: {u.role} | ID: #{u.id} | APPROVED: {u.is_approved ? "YES" : "NO"}</div>
-              <div className="actions" style={{ borderTop: "none", marginTop: "10px" }}>
-                <button onClick={() => changePassword(u.id)} className="swiss-btn warning" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>PWD</button>
-                <button onClick={() => deleteUser(u.id)} className="swiss-btn danger" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>DEL</button>
-              </div>
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      <h3 style={{ textTransform: "uppercase", borderBottom: "3px solid var(--border-heavy)", paddingBottom: "10px" }}>ALL SESSIONS</h3>
-      <div className="dashboard-grid" style={{ marginTop: "20px" }}>
+          {activeTab === "sessions" && (
+            <div>
+              <h3 style={{ textTransform: "uppercase", borderBottom: "2px solid var(--border-heavy)", paddingBottom: "10px" }}>
+                ALL SESSIONS ({sessions.length})
+              </h3>
+              <div className="dashboard-grid" style={{ marginTop: "20px" }}>
         {sessions.map(s => {
           const evalData = s.evaluations && s.evaluations.length > 0 ? s.evaluations[0] : null;
 
@@ -345,7 +366,6 @@ function AdminTab({ user }) {
                   <div className="actions">
                     <button onClick={() => startEditing(s)} className="swiss-btn warning">EDIT</button>
                     <button onClick={() => openEnrollments(s.id)} className="swiss-btn">ENROLL</button>
-                    <button onClick={() => triggerEvaluation(s.id)} className="swiss-btn outline">EVAL</button>
                     <button onClick={() => deleteSession(s.id)} className="swiss-btn danger">DEL</button>
                   </div>
 
@@ -385,6 +405,10 @@ function AdminTab({ user }) {
           );
         })}
       </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -400,6 +424,8 @@ function TeacherTab({ user }) {
   const [editDesc, setEditDesc] = useState("");
   const [allStudents, setAllStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [activeTab, setActiveTab] = useState("sessions");
+  const [evaluatingSessions, setEvaluatingSessions] = useState([]);
 
   const headers = { "Authorization": `Bearer ${user.token}`, "Content-Type": "application/json" };
 
@@ -456,49 +482,72 @@ function TeacherTab({ user }) {
   };
 
   const triggerEvaluation = async (sessionId) => {
+    setEvaluatingSessions(prev => [...prev, sessionId]);
     const response = await fetch(`${API_URL}/sessions/${sessionId}/evaluate`, { method: "POST", headers });
     if (response.ok) {
       alert("EVALUATION TRIGGERED!");
-      loadMySessions();
+      setTimeout(() => {
+        setEvaluatingSessions(prev => prev.filter(id => id !== sessionId));
+        loadMySessions();
+      }, 2500); // Simulate evaluation delay
+    } else {
+      setEvaluatingSessions(prev => prev.filter(id => id !== sessionId));
+      alert("Failed to trigger evaluation.");
     }
   };
 
   return (
     <div>
-      <div style={{ marginBottom: "60px" }}>
-        <div className="swiss-banner">
-          <h2>CREATE NEW SESSION</h2>
+      <div className="tab-container">
+        <div className="tab-buttons">
+          <button 
+            className={`tab-button ${activeTab === "sessions" ? "active" : ""}`} 
+            onClick={() => setActiveTab("sessions")}
+          >
+            My Sessions
+          </button>
+          <button 
+            className={`tab-button ${activeTab === "create" ? "active" : ""}`} 
+            onClick={() => setActiveTab("create")}
+          >
+            Create New Session
+          </button>
         </div>
-        <form onSubmit={createSession} className="form-group" style={{ maxWidth: "600px" }}>
-          <input placeholder="TITLE" value={newTitle} onChange={e => setNewTitle(e.target.value)} required className="swiss-input" />
-          <textarea placeholder="DESCRIPTION" value={newDesc} onChange={e => setNewDesc(e.target.value)} required className="swiss-input" rows="3" />
-          
-          <div style={{ margin: "15px 0", maxHeight: "200px", overflowY: "auto", border: "2px solid var(--border-heavy)", padding: "10px" }}>
-            <h4 style={{ margin: "0 0 10px 0", fontSize: "0.9rem" }}>SELECT STUDENTS TO ENROLL</h4>
-            {allStudents.map(student => (
-              <label key={student.id} style={{ display: "block", marginBottom: "5px", cursor: "pointer", fontSize: "0.9rem" }}>
-                <input 
-                  type="checkbox" 
-                  checked={selectedStudentIds.includes(student.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, student.id]);
-                    else setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id));
-                  }}
-                  style={{ marginRight: "10px" }}
-                />
-                {student.name} ({student.roll_no})
-              </label>
-            ))}
-          </div>
 
-          <button type="submit" className="swiss-btn" style={{ width: "fit-content" }}>DEPLOY SESSION</button>
-        </form>
-      </div>
+        <div className="tab-content">
+          {activeTab === "create" && (
+            <div>
+              <h3 style={{ textTransform: "uppercase", borderBottom: "2px solid var(--border-heavy)", paddingBottom: "10px", marginBottom: "20px" }}>CREATE NEW SESSION</h3>
+              <form onSubmit={createSession} className="form-group" style={{ maxWidth: "600px" }}>
+                <input placeholder="TITLE" value={newTitle} onChange={e => setNewTitle(e.target.value)} required className="swiss-input" />
+                <textarea placeholder="DESCRIPTION" value={newDesc} onChange={e => setNewDesc(e.target.value)} required className="swiss-input" rows="3" />
+                
+                <div style={{ margin: "15px 0", maxHeight: "200px", overflowY: "auto", border: "2px solid var(--border-heavy)", padding: "10px", borderRadius: "4px" }}>
+                  <h4 style={{ margin: "0 0 10px 0", fontSize: "0.9rem" }}>SELECT STUDENTS TO ENROLL</h4>
+                  {allStudents.map(student => (
+                    <label key={student.id} style={{ display: "block", marginBottom: "5px", cursor: "pointer", fontSize: "0.9rem" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedStudentIds.includes(student.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, student.id]);
+                          else setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id));
+                        }}
+                        style={{ marginRight: "10px" }}
+                      />
+                      {student.name} ({student.roll_no})
+                    </label>
+                  ))}
+                </div>
 
-      <div>
-        <div className="swiss-banner">
-          <h2>ACTIVE SESSIONS</h2>
-        </div>
+                <button type="submit" className="swiss-btn" style={{ width: "fit-content" }}>DEPLOY SESSION</button>
+              </form>
+            </div>
+          )}
+
+          {activeTab === "sessions" && (
+            <div>
+              <h3 style={{ textTransform: "uppercase", borderBottom: "2px solid var(--border-heavy)", paddingBottom: "10px", marginBottom: "20px" }}>ACTIVE SESSIONS</h3>
         
         {dbSessions.length === 0 && <p>No sessions found.</p>}
         
@@ -521,7 +570,11 @@ function TeacherTab({ user }) {
                     <h4>{s.title}</h4>
                     <p>{s.description}</p>
                     
-                    {evalData ? (
+                    {evaluatingSessions.includes(s.id) ? (
+                      <div className="status-badge pending" style={{ borderColor: "var(--accent-blue)", color: "var(--accent-blue)", borderStyle: "solid" }}>
+                        EVALUATION IN PROGRESS...
+                      </div>
+                    ) : evalData ? (
                       <div className="status-badge evaluated">
                         SCORE: {evalData.score} | {evalData.feedback.substring(0, 30)}...
                       </div>
@@ -539,6 +592,9 @@ function TeacherTab({ user }) {
               </div>
             );
           })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -574,12 +630,11 @@ function ParentTab({ user }) {
 
   return (
     <div>
-      <div className="swiss-banner" style={{ background: "var(--border-color)", color: "#000", borderColor: "var(--text-primary)", boxShadow: "none" }}>
+      <div className="swiss-banner">
         <div>
-          <h2 style={{ color: "#000" }}>PARENT TERMINAL (READ-ONLY)</h2>
-          {user.student_name && <div style={{ fontSize: "1rem", marginTop: "10px", fontWeight: "600" }}>STUDENT: {user.student_name.toUpperCase()} (ROLL: {user.student_roll})</div>}
+          <h2 style={{ fontSize: "1.25rem", marginBottom: "5px" }}>PARENT TERMINAL</h2>
+          {user.student_name && <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "var(--text-secondary)" }}>STUDENT: {user.student_name.toUpperCase()} (ROLL: {user.student_roll})</div>}
         </div>
-        <button onClick={testParentAccess} className="swiss-btn outline" style={{ borderColor: "#000", color: "#000" }}>SECURITY TEST</button>
       </div>
       
       {msg && <div className="status-badge pending" style={{ borderColor: "var(--accent-red)", color: "var(--accent-red)" }}>{msg}</div>}
