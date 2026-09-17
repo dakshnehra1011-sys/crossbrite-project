@@ -41,7 +41,7 @@ export default function App() {
   );
 }
 
-// ----------------- AUTH SCREEN -----------------
+
 function AuthScreen({ onAuthSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
   const [inputValue, setInputValue] = useState("");
@@ -49,6 +49,8 @@ function AuthScreen({ onAuthSuccess }) {
   const [role, setRole] = useState("teacher");
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [studentName, setStudentName] = useState("");
+  const [studentRoll, setStudentRoll] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,7 +58,11 @@ function AuthScreen({ onAuthSuccess }) {
     setSuccessMsg("");
     
     const endpoint = isLogin ? "/login" : "/signup";
-    const payload = isLogin ? { user_id: parseInt(inputValue), password } : { name: inputValue, password, role };
+    let payload = isLogin ? { user_id: parseInt(inputValue), password } : { name: inputValue, password, role };
+    
+    if (!isLogin && role === "parent") {
+      payload = { ...payload, student_name: studentName, student_roll: studentRoll };
+    }
 
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -111,6 +117,26 @@ function AuthScreen({ onAuthSuccess }) {
               <option value="parent">PARENT</option>
             </select>
           )}
+          {!isLogin && role === "parent" && (
+            <>
+              <input 
+                type="text"
+                placeholder="CHILD'S NAME"
+                value={studentName}
+                onChange={e => setStudentName(e.target.value)}
+                required
+                className="swiss-input"
+              />
+              <input 
+                type="text"
+                placeholder="CHILD'S ROLL NUMBER"
+                value={studentRoll}
+                onChange={e => setStudentRoll(e.target.value)}
+                required
+                className="swiss-input"
+              />
+            </>
+          )}
           <button type="submit" className="swiss-btn">
             {isLogin ? "Enter" : "Generate ID"}
           </button>
@@ -124,7 +150,7 @@ function AuthScreen({ onAuthSuccess }) {
   );
 }
 
-// ----------------- ADMIN DASHBOARD -----------------
+
 function AdminTab({ user }) {
   const [sessions, setSessions] = useState([]);
   const [editingSessionId, setEditingSessionId] = useState(null);
@@ -134,6 +160,10 @@ function AdminTab({ user }) {
   const headers = { "Authorization": `Bearer ${user.token}`, "Content-Type": "application/json" };
 
   const [pendingUsers, setPendingUsers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [managingSessionId, setManagingSessionId] = useState(null);
+  const [sessionEnrollments, setSessionEnrollments] = useState([]);
 
   const loadSessions = async () => {
     const response = await fetch(`${API_URL}/sessions/`, { headers });
@@ -144,15 +174,59 @@ function AdminTab({ user }) {
     const response = await fetch(`${API_URL}/users/pending`, { headers });
     if (response.ok) setPendingUsers(await response.json());
   };
+
+  const loadAllUsers = async () => {
+    const response = await fetch(`${API_URL}/users`, { headers });
+    if (response.ok) setUsers(await response.json());
+  };
+
+  const loadAllStudents = async () => {
+    const response = await fetch(`${API_URL}/students`, { headers });
+    if (response.ok) setAllStudents(await response.json());
+  };
   
   useEffect(() => { 
     loadSessions(); 
     loadPendingUsers();
+    loadAllUsers();
+    loadAllStudents();
   }, []);
 
   const approveUser = async (userId) => {
     const response = await fetch(`${API_URL}/users/${userId}/approve`, { method: "POST", headers });
-    if (response.ok) loadPendingUsers();
+    if (response.ok) { loadPendingUsers(); loadAllUsers(); }
+  };
+
+  const deleteUser = async (id) => {
+    if (!window.confirm("SUPERUSER: DELETE USER? This cannot be undone.")) return;
+    const response = await fetch(`${API_URL}/users/${id}`, { method: "DELETE", headers });
+    if (response.ok) { loadAllUsers(); loadSessions(); }
+  };
+
+  const changePassword = async (id) => {
+    const newPwd = window.prompt("Enter new password for user:");
+    if (!newPwd) return;
+    const response = await fetch(`${API_URL}/users/${id}/password`, { 
+      method: "PUT", headers, body: JSON.stringify({ new_password: newPwd }) 
+    });
+    if (response.ok) alert("PASSWORD UPDATED!");
+  };
+
+  const openEnrollments = async (sessionId) => {
+    setManagingSessionId(sessionId);
+    const response = await fetch(`${API_URL}/sessions/${sessionId}/students`, { headers });
+    if (response.ok) setSessionEnrollments(await response.json());
+  };
+
+  const closeEnrollments = () => {
+    setManagingSessionId(null);
+    setSessionEnrollments([]);
+  };
+
+  const toggleStudent = async (studentId, isEnrolled) => {
+    const method = isEnrolled ? "DELETE" : "POST";
+    const response = await fetch(`${API_URL}/sessions/${managingSessionId}/students/${studentId}`, { method, headers });
+    if (response.ok) openEnrollments(managingSessionId);
   };
 
   const deleteSession = async (sessionId) => {
@@ -219,6 +293,24 @@ function AdminTab({ user }) {
         </div>
       )}
 
+      <div style={{ marginBottom: "40px" }}>
+        <h3 style={{ textTransform: "uppercase", borderBottom: "3px solid var(--border-heavy)", paddingBottom: "10px" }}>
+          USER MANAGEMENT ({users.length})
+        </h3>
+        <div className="dashboard-grid" style={{ marginTop: "20px" }}>
+          {users.map(u => (
+            <div key={u.id} className="swiss-card" style={{ padding: "15px" }}>
+              <h4>{u.username}</h4>
+              <div className="meta">ROLE: {u.role} | ID: #{u.id} | APPROVED: {u.is_approved ? "YES" : "NO"}</div>
+              <div className="actions" style={{ borderTop: "none", marginTop: "10px" }}>
+                <button onClick={() => changePassword(u.id)} className="swiss-btn warning" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>PWD</button>
+                <button onClick={() => deleteUser(u.id)} className="swiss-btn danger" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>DEL</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <h3 style={{ textTransform: "uppercase", borderBottom: "3px solid var(--border-heavy)", paddingBottom: "10px" }}>ALL SESSIONS</h3>
       <div className="dashboard-grid" style={{ marginTop: "20px" }}>
         {sessions.map(s => {
@@ -252,9 +344,41 @@ function AdminTab({ user }) {
 
                   <div className="actions">
                     <button onClick={() => startEditing(s)} className="swiss-btn warning">EDIT</button>
+                    <button onClick={() => openEnrollments(s.id)} className="swiss-btn">ENROLL</button>
                     <button onClick={() => triggerEvaluation(s.id)} className="swiss-btn outline">EVAL</button>
                     <button onClick={() => deleteSession(s.id)} className="swiss-btn danger">DEL</button>
                   </div>
+
+                  {managingSessionId === s.id && (
+                    <div style={{ marginTop: "20px", border: "2px solid var(--border-heavy)", padding: "10px", background: "#f8f9fa" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                        <h4 style={{ margin: 0, fontSize: "0.9rem" }}>MANAGE ENROLLMENTS</h4>
+                        <button onClick={closeEnrollments} className="swiss-btn outline" style={{ padding: "2px 8px", fontSize: "0.8rem" }}>X</button>
+                      </div>
+                      <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
+                        <div style={{ marginBottom: "20px" }}>
+                          <h5 style={{ margin: "0 0 8px 0", fontSize: "0.85rem", color: "var(--accent-red)" }}>ALREADY ENROLLED</h5>
+                          {allStudents.filter(st => sessionEnrollments.includes(st.id)).length === 0 && <span style={{fontSize:"0.8rem", color:"gray"}}>No students enrolled.</span>}
+                          {allStudents.filter(st => sessionEnrollments.includes(st.id)).map(student => (
+                            <div key={student.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: "0.9rem" }}>
+                              <span>{student.name} ({student.roll_no})</span>
+                              <button onClick={() => toggleStudent(student.id, true)} className="swiss-btn danger" style={{ padding: "3px 8px", fontSize: "0.7rem", height: "auto", minWidth: "auto" }}>REMOVE</button>
+                            </div>
+                          ))}
+                        </div>
+                        <div>
+                          <h5 style={{ margin: "0 0 8px 0", fontSize: "0.85rem", color: "var(--text-main)" }}>AVAILABLE STUDENTS</h5>
+                          {allStudents.filter(st => !sessionEnrollments.includes(st.id)).length === 0 && <span style={{fontSize:"0.8rem", color:"gray"}}>All students are enrolled.</span>}
+                          {allStudents.filter(st => !sessionEnrollments.includes(st.id)).map(student => (
+                            <div key={student.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: "0.9rem" }}>
+                              <span>{student.name} ({student.roll_no})</span>
+                              <button onClick={() => toggleStudent(student.id, false)} className="swiss-btn" style={{ padding: "3px 8px", fontSize: "0.7rem", height: "auto", minWidth: "auto" }}>ADD</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -265,7 +389,7 @@ function AdminTab({ user }) {
   );
 }
 
-// ----------------- TEACHER DASHBOARD -----------------
+
 function TeacherTab({ user }) {
   const [dbSessions, setDbSessions] = useState([]);
   const [newTitle, setNewTitle] = useState("");
@@ -274,6 +398,8 @@ function TeacherTab({ user }) {
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [allStudents, setAllStudents] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
 
   const headers = { "Authorization": `Bearer ${user.token}`, "Content-Type": "application/json" };
 
@@ -282,15 +408,20 @@ function TeacherTab({ user }) {
     if (response.ok) setDbSessions(await response.json());
   };
 
-  useEffect(() => { loadMySessions(); }, []);
+  const loadStudents = async () => {
+    const response = await fetch(`${API_URL}/students`, { headers });
+    if (response.ok) setAllStudents(await response.json());
+  };
+
+  useEffect(() => { loadMySessions(); loadStudents(); }, []);
 
   const createSession = async (e) => {
     e.preventDefault();
     const response = await fetch(`${API_URL}/sessions/`, {
-      method: "POST", headers, body: JSON.stringify({ title: newTitle, description: newDesc }),
+      method: "POST", headers, body: JSON.stringify({ title: newTitle, description: newDesc, student_ids: selectedStudentIds }),
     });
     if (response.ok) {
-      setNewTitle(""); setNewDesc(""); loadMySessions();
+      setNewTitle(""); setNewDesc(""); setSelectedStudentIds([]); loadMySessions();
     }
   };
 
@@ -341,6 +472,25 @@ function TeacherTab({ user }) {
         <form onSubmit={createSession} className="form-group" style={{ maxWidth: "600px" }}>
           <input placeholder="TITLE" value={newTitle} onChange={e => setNewTitle(e.target.value)} required className="swiss-input" />
           <textarea placeholder="DESCRIPTION" value={newDesc} onChange={e => setNewDesc(e.target.value)} required className="swiss-input" rows="3" />
+          
+          <div style={{ margin: "15px 0", maxHeight: "200px", overflowY: "auto", border: "2px solid var(--border-heavy)", padding: "10px" }}>
+            <h4 style={{ margin: "0 0 10px 0", fontSize: "0.9rem" }}>SELECT STUDENTS TO ENROLL</h4>
+            {allStudents.map(student => (
+              <label key={student.id} style={{ display: "block", marginBottom: "5px", cursor: "pointer", fontSize: "0.9rem" }}>
+                <input 
+                  type="checkbox" 
+                  checked={selectedStudentIds.includes(student.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, student.id]);
+                    else setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id));
+                  }}
+                  style={{ marginRight: "10px" }}
+                />
+                {student.name} ({student.roll_no})
+              </label>
+            ))}
+          </div>
+
           <button type="submit" className="swiss-btn" style={{ width: "fit-content" }}>DEPLOY SESSION</button>
         </form>
       </div>
@@ -395,7 +545,7 @@ function TeacherTab({ user }) {
   );
 }
 
-// ----------------- PARENT DASHBOARD -----------------
+
 function ParentTab({ user }) {
   const [sessions, setSessions] = useState([]);
   const [msg, setMsg] = useState("");
@@ -424,9 +574,12 @@ function ParentTab({ user }) {
 
   return (
     <div>
-      <div className="swiss-banner" style={{ background: "var(--border-color)", color: "var(--text-primary)", borderColor: "var(--text-primary)", boxShadow: "none" }}>
-        <h2>PARENT TERMINAL (READ-ONLY)</h2>
-        <button onClick={testParentAccess} className="swiss-btn outline">SECURITY TEST</button>
+      <div className="swiss-banner" style={{ background: "var(--border-color)", color: "#000", borderColor: "var(--text-primary)", boxShadow: "none" }}>
+        <div>
+          <h2 style={{ color: "#000" }}>PARENT TERMINAL (READ-ONLY)</h2>
+          {user.student_name && <div style={{ fontSize: "1rem", marginTop: "10px", fontWeight: "600" }}>STUDENT: {user.student_name.toUpperCase()} (ROLL: {user.student_roll})</div>}
+        </div>
+        <button onClick={testParentAccess} className="swiss-btn outline" style={{ borderColor: "#000", color: "#000" }}>SECURITY TEST</button>
       </div>
       
       {msg && <div className="status-badge pending" style={{ borderColor: "var(--accent-red)", color: "var(--accent-red)" }}>{msg}</div>}
